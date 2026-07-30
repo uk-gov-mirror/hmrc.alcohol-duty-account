@@ -17,12 +17,13 @@
 package uk.gov.hmrc.alcoholdutyaccount.service
 
 import cats.data.EitherT
-import cats.implicits._
+import cats.implicits.*
 import play.api.Logging
+import uk.gov.hmrc.alcoholdutyaccount.config.AppConfig
 import uk.gov.hmrc.alcoholdutyaccount.connectors.FinancialDataConnector
 import uk.gov.hmrc.alcoholdutyaccount.models.hods.{FinancialTransaction, FinancialTransactionDocument}
 import uk.gov.hmrc.alcoholdutyaccount.models.payments.TransactionType.Overpayment
-import uk.gov.hmrc.alcoholdutyaccount.models.payments._
+import uk.gov.hmrc.alcoholdutyaccount.models.payments.*
 import uk.gov.hmrc.alcoholdutyaccount.utils.payments.PaymentsValidator
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.http.ErrorResponse
@@ -33,7 +34,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class OpenPaymentsService @Inject() (
   financialDataConnector: FinancialDataConnector,
   financialDataValidator: PaymentsValidator
-)(implicit ec: ExecutionContext)
+)(implicit ec: ExecutionContext, appConfig: AppConfig)
     extends Logging {
 
   private val contractObjectType = "ZADP"
@@ -118,7 +119,11 @@ class OpenPaymentsService @Inject() (
         case ((outstandingPayments, unallocatedPayments), openPayment) =>
           openPayment match {
             case outstandingPayment @ OutstandingPayment(_, _, _, _, _, _) =>
-              (outstandingPayment :: outstandingPayments, unallocatedPayments)
+              if (appConfig.isOfficerAssessment) {
+                (outstandingPayment :: outstandingPayments, unallocatedPayments)
+              } else {
+                (excludeOfficerAssessmentItems(outstandingPayment :: outstandingPayments), unallocatedPayments)
+              }
             case unallocatedPayment @ UnallocatedPayment(_, _)             =>
               (outstandingPayments, unallocatedPayment :: unallocatedPayments)
           }
@@ -134,6 +139,12 @@ class OpenPaymentsService @Inject() (
       totalOpenPaymentsAmount = paymentTotals.totalOpenPaymentsAmount
     )
   }
+
+  private def excludeOfficerAssessmentItems(list: List[OutstandingPayment]): List[OutstandingPayment] =
+    list.filterNot(oP =>
+      TransactionType.isOfficerAssessment(oP.transactionType.mainTransactionType) || TransactionType
+        .isOfficerAssessmentLPI(oP.transactionType.mainTransactionType)
+    )
 
   private def calculateTotalBalance(
     outstandingPayments: Seq[OutstandingPayment],

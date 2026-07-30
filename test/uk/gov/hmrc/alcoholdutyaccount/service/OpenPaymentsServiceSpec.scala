@@ -895,7 +895,7 @@ class OpenPaymentsServiceSpec extends SpecBase {
     val mockFinancialDataConnector                = mock[FinancialDataConnector]
     private val mockAppConfig                     = mock[AppConfig]
     val paymentsValidator: PaymentsValidator      = new PaymentsValidator(mockAppConfig)
-    val paymentsService                           = new OpenPaymentsService(mockFinancialDataConnector, paymentsValidator)
+    val paymentsService                           = new OpenPaymentsService(mockFinancialDataConnector, paymentsValidator)(ec, mockAppConfig)
     val year                                      = 2024
     val singlePartiallyOutstandingReturnOpen      = singlePartiallyOutstandingReturn(onlyOpenItems = true)
     val twoLineItemPartiallyOutstandingReturnOpen = twoLineItemPartiallyOutstandingReturn(onlyOpenItems = true)
